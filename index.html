@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Block Decoder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #000000;
+    --charcoal: #1A1A1A;
+    --white: #FFFFFF;
+    --linen: #FAF1E2;
+    --fire: #FF2D8B;
+    --gold: #C9A96E;
+    --plum: #3D1A4F;
+    --display: 'Cormorant Garamond', Georgia, serif;
+    --body: 'DM Sans', -apple-system, sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: var(--body);
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Atmospheric background glow */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120%;
+    height: 70%;
+    background: radial-gradient(ellipse at center, rgba(61, 26, 79, 0.55) 0%, rgba(61, 26, 79, 0.15) 40%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -10%;
+    left: 30%;
+    width: 80%;
+    height: 50%;
+    background: radial-gradient(ellipse at center, rgba(255, 45, 139, 0.10) 0%, transparent 65%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 22px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Screen system */
+  .screen { display: none; flex: 1; flex-direction: column; }
+  .screen.active { display: flex; animation: fadeIn 0.45s ease both; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 500;
+  }
+
+  /* ---------- WELCOME ---------- */
+  #welcome {
+    justify-content: center;
+    text-align: center;
+    padding: 56px 0;
+  }
+  #welcome .eyebrow { margin-bottom: 28px; }
+
+  .prehead {
+    font-family: var(--body);
+    font-size: 14px;
+    color: var(--linen);
+    opacity: 0.7;
+    max-width: 420px;
+    margin: 0 auto 22px;
+    line-height: 1.6;
+  }
+
+  .headline {
+    font-family: var(--display);
+    font-weight: 300;
+    font-size: 38px;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    margin-bottom: 26px;
+  }
+  .headline em {
+    font-style: italic;
+    color: var(--gold);
+  }
+
+  .deck {
+    font-size: 15px;
+    color: var(--linen);
+    opacity: 0.62;
+    max-width: 460px;
+    margin: 0 auto 38px;
+    line-height: 1.65;
+  }
+
+  .footer-note {
+    font-size: 11.5px;
+    color: var(--linen);
+    opacity: 0.4;
+    margin-top: 26px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ---------- BUTTONS ---------- */
+  .btn {
+    display: block;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+    background: var(--fire);
+    color: var(--white);
+    border: none;
+    border-radius: 8px;
+    height: 58px;
+    font-family: var(--body);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter 0.2s ease, transform 0.1s ease;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.3;
+    padding: 0 18px;
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .btn:active { transform: scale(0.985); }
+  .btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--gold);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    height: auto;
+    font-size: 14px;
+    margin-top: 22px;
+    text-decoration: none;
+  }
+  .btn-ghost:hover { text-decoration: underline; filter: none; }
+
+  .link-min {
+    background: none;
+    border: none;
+    color: var(--linen);
+    opacity: 0.45;
+    font-family: var(--body);
+    font-size: 12.5px;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    transition: opacity 0.2s ease;
+  }
+  .link-min:hover { opacity: 0.8; }
+
+  /* ---------- QUIZ ---------- */
+  #quiz { padding: 28px 0 48px; }
+
+  .progress-track {
+    width: 100%;
+    height: 3px;
+    background: var(--charcoal);
+    margin-bottom: 8px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--fire);
+    transition: width 0.35s ease;
+  }
+  .q-count {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 38px;
+  }
+
+  .question {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 27px;
+    line-height: 1.25;
+    margin-bottom: 30px;
+    letter-spacing: -0.005em;
+  }
+
+  .options { display: flex; flex-direction: column; gap: 12px; }
+
+  .option {
+    background: var(--charcoal);
+    border: 1px solid rgba(201, 169, 110, 0.18);
+    border-radius: 12px;
+    padding: 17px 19px;
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--white);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    width: 100%;
+  }
+  .option:hover { border-color: rgba(201, 169, 110, 0.45); }
+  .option.selected {
+    border-color: var(--fire);
+    border-width: 2px;
+    background: rgba(255, 45, 139, 0.09);
+    padding: 16px 18px;
+  }
+  .option:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+  .quiz-nav {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 32px;
+  }
+  .quiz-nav .btn { margin: 0; flex: 1; max-width: none; }
+  .back-btn {
+    background: none;
+    border: none;
+    color: var(--linen);
+    opacity: 0.55;
+    font-family: var(--body);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 8px 4px;
+    letter-spacing: 0.02em;
+    transition: opacity 0.2s ease;
+    white-space: nowrap;
+  }
+  .back-btn:hover { opacity: 1; }
+  .next-disabled { opacity: 0.3; pointer-events: none; }
+
+  /* ---------- RESULT ---------- */
+  #result { padding: 36px 0 64px; }
+
+  /* Hero block */
+  .result-hero {
+    background: var(--charcoal);
+    border: 1px solid rgba(201, 169, 110, 0.22);
+    border-radius: 16px;
+    padding: 28px 24px 24px;
+    margin-bottom: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .result-hero::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 180px; height: 180px;
+    background: radial-gradient(circle, rgba(255,45,139,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .result-label {
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 12px;
+  }
+  .result-icon {
+    font-size: 48px;
+    line-height: 1;
+    margin-bottom: 14px;
+    display: block;
+  }
+  .result-name {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 36px;
+    line-height: 1.05;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+  .result-sub {
+    font-family: var(--body);
+    font-size: 14px;
+    color: var(--fire);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    margin-bottom: 16px;
+    line-height: 1.4;
+  }
+  .result-explain {
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--linen);
+    opacity: 0.82;
+  }
+
+  /* Truth pills */
+  .truth-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 18px 0 0;
+  }
+  .pill {
+    background: rgba(255,45,139,0.1);
+    border: 1px solid rgba(255,45,139,0.25);
+    border-radius: 100px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--linen);
+    opacity: 0.9;
+    letter-spacing: 0.01em;
+  }
+
+  .section-divider {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 26px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(201, 169, 110, 0.2);
+  }
+
+  /* Practice steps */
+  .practice-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .practice-step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(201,169,110,0.15);
+    border: 1px solid rgba(201,169,110,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0;
+    margin-top: 1px;
+  }
+  .step-text {
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--linen);
+    opacity: 0.9;
+    padding-top: 3px;
+  }
+  .step-text strong { color: var(--white); font-weight: 600; }
+
+  /* Sound does */
+  .sound-does-text {
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--linen);
+    opacity: 0.78;
+    margin-bottom: 18px;
+    font-style: italic;
+  }
+
+  /* Audio block */
+  .audio-card {
+    background: var(--plum);
+    border: 1px solid rgba(201, 169, 110, 0.25);
+    border-radius: 12px;
+    padding: 22px;
+  }
+  .audio-intro {
+    font-size: 13px;
+    color: var(--linen);
+    opacity: 0.85;
+    margin-bottom: 16px;
+    text-align: center;
+    letter-spacing: 0.02em;
+  }
+
+  /* Custom audio player */
+  .player {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .play-btn {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--fire);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: filter 0.2s ease, transform 0.1s ease;
+  }
+  .play-btn:hover { filter: brightness(1.12); }
+  .play-btn:active { transform: scale(0.94); }
+  .play-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+  .play-btn svg { width: 20px; height: 20px; fill: var(--white); }
+  .play-icon-pause { display: none; }
+  .play-btn.playing .play-icon-play { display: none; }
+  .play-btn.playing .play-icon-pause { display: block; }
+
+  .player-body { flex: 1; min-width: 0; }
+  .scrub-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(250, 241, 226, 0.2);
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .scrub-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--gold);
+    border-radius: 3px;
+    transition: width 0.1s linear;
+  }
+  .player-time {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--linen);
+    opacity: 0.6;
+    margin-top: 8px;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Buy push card */
+  .buy-push {
+    background: linear-gradient(135deg, rgba(61,26,79,0.8) 0%, rgba(26,10,36,0.95) 100%);
+    border: 1px solid rgba(255,45,139,0.3);
+    border-radius: 16px;
+    padding: 28px 24px;
+    margin-top: 28px;
+    text-align: center;
+  }
+  .buy-push-hook {
+    font-family: var(--display);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1.2;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+  .buy-push-sub {
+    font-size: 13.5px;
+    color: var(--linen);
+    opacity: 0.72;
+    line-height: 1.6;
+    margin-bottom: 22px;
+  }
+  .buy-push-sub strong { color: var(--gold); font-weight: 500; opacity: 1; }
+  .upsell-line {
+    font-size: 13px;
+    color: var(--linen);
+    opacity: 0.55;
+    margin-top: 14px;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  .start-over-wrap {
+    text-align: center;
+    margin-top: 36px;
+  }
+
+  /* Desktop refinements */
+  @media (min-width: 768px) {
+    .wrap { padding: 0 24px; }
+    #welcome { padding: 80px 0; }
+    .headline { font-size: 60px; }
+    .question { font-size: 35px; }
+    .result-name { font-size: 60px; }
+    .prehead { font-size: 15px; }
+    .deck { font-size: 16px; }
+  }
+
+  @media (max-width: 360px) {
+    .headline { font-size: 32px; }
+    .result-name { font-size: 36px; }
+    .question { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ WELCOME ============ -->
+  <section id="welcome" class="screen active">
+    <h1 class="headline">Find What's Blocking You &amp; <em>Move It Today</em> With Sound</h1>
+    <p class="deck">A free 2-minute assessment from Theresa Nguyen, built on 15 years of somatic sound healing and the dragon frequency that reaches where therapy and journaling can't.</p>
+    <button class="btn" id="startBtn">Find My Block</button>
+    <p class="footer-note">Free tool · No login required · Takes 2 minutes</p>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section id="quiz" class="screen">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="q-count" id="qCount">Question 1 of 8</div>
+    <h2 class="question" id="questionText"></h2>
+    <div class="options" id="options"></div>
+    <div class="quiz-nav">
+      <button class="back-btn" id="backBtn" style="display:none;">← Back</button>
+      <button class="btn next-disabled" id="nextBtn">Next</button>
+    </div>
+  </section>
+
+  <!-- ============ RESULT ============ -->
+  <section id="result" class="screen">
+
+    <!-- Hero card -->
+    <div class="result-hero">
+      <div class="result-label">Your Voice Block</div>
+      <h2 class="result-name" id="resName"></h2>
+      <p class="result-sub" id="resSub"></p>
+      <p class="result-explain" id="resExplain"></p>
+      <div class="truth-pills" id="resPills"></div>
+    </div>
+
+    <!-- Practice -->
+    <div class="section-divider">Your 2-Minute Practice</div>
+    <div class="practice-steps" id="resPractice"></div>
+
+    <!-- Sound -->
+    <div class="section-divider">Feel What Sound Does</div>
+    <p class="sound-does-text" id="resSoundDoes"></p>
+    <div class="audio-card">
+      <p class="audio-intro" id="audioIntro">45 seconds. Press play and feel the difference.</p>
+      <div class="player">
+        <button class="play-btn" id="playBtn" aria-label="Play audio sample">
+          <svg class="play-icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <svg class="play-icon-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+        </button>
+        <div class="player-body">
+          <div class="scrub-track" id="scrubTrack"><div class="scrub-fill" id="scrubFill"></div></div>
+          <div class="player-time"><span id="curTime">0:00</span><span id="durTime">0:30</span></div>
+        </div>
+      </div>
+      <audio id="audioEl" preload="metadata"></audio>
+    </div>
+
+    <!-- Buy push -->
+    <div class="buy-push">
+      <p class="buy-push-hook" id="buyHook"></p>
+      <p class="buy-push-sub" id="buySub"></p>
+      <a class="btn" id="buyBtn" href="#" target="_blank" rel="noopener" style="max-width:100%;margin:0 0 0 0;"></a>
+      <p class="upsell-line" id="upsellLine"></p>
+    </div>
+
+    <a class="btn-ghost" id="programLink" href="https://theresanguyenspeaks.com/vocalfreedom" target="_blank" rel="noopener" style="text-align:center;margin-top:18px;">Go deeper with Vocal Expansion →</a>
+
+    <div class="start-over-wrap">
+      <button class="link-min" id="startOverBtn">Retake the quiz</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   DATA — edit copy, audio URLs, and product links here only.
+   Audio URLs are placeholders. Swap in Theresa's 45s clips.
+   ============================================================ */
+const BLOCKS = {
+  J: {
+    name: "Fear of Being Judged",
+    icon: "🔇",
+    sub: "You censor what you want to say in your head before you even open your mouth.",
+    explain: "You quickly revise and rehearse what you think you want to say in your head, and when it's time for you to say it, you end up just agreeing with what was said, or saying the safer version of your truth, the one less likely to be judged. This started in your early years. Somewhere back then, you spoke up and got laughed at, or corrected, or told that what you felt or said was wrong, and it happened enough times that your body automatically tenses up before you speak. That fear didn't go anywhere. It's stored in your tissues, even in your vocal cords, and you can feel it now, your throat tightening, a heaviness or constriction in your chest, that sinking, anxious, dropping feeling in the pit of your stomach. So you learned you could mold yourself into a more acceptable version of you, choosing words that were safe and agreeable, so no one could ridicule you, and you'd stay on everyone's good side. But it still eats at you, because part of you keeps going back and forth, wishing you'd worded it differently, or just said how you really felt.",
+    pills: ["Rehearsing before you speak", "Saying the safe version", "Replaying it in your head after"],
+    practiceSteps: [
+      "Breathe in slowly through your nose.",
+      "On the way out, let it turn into a long, low hum, and feel it buzz in your chest.",
+      "Stay with it as long as the breath lasts.",
+      "Do that six times."
+    ],
+    track: "Clear Negativity",
+    soundDoes: "When you hum on a long exhale, you're telling your body it's safe, and your throat relaxes on its own. Sound and frequency help to harmonize the reactivity that you feel. As your body lets go of the fear, starting to speak feels less risky.",
+    buyHook: "You've been censoring your words for so long it feels normal.",
+    buySub: "Maybe nothing's worked yet because nothing has reached this depth of awareness. The full Clear Negativity Activation goes straight to where the wounds around your voice are held.",
+    audioIntro: "Press play to experience the Clear Negativity Dragon Light Code Activation. Close your eyes, breathe, and surrender to the sound as it does the work for you. 45 seconds. Let's go.",
+    audio: "audio/ClearNegEnergyV3.mp3",
+    buyUrl: "https://theresanguyenspeaks.com/shop"
+  },
+  C: {
+    name: "Fear of Criticism",
+    icon: "🧱",
+    sub: "You over-prepare, over-explain, and still feel worse after you speak.",
+    explain: "Before you say anything, you rehearse it in your head over and over, making sure you have it just right so there's nothing for anyone to pick at. You add the explanation, the points that back you up, anything that makes it harder for someone to come at you. It honestly feels like you're about to be attacked, because your body remembers the times someone threw your own words back at you later, or responded in a way that was meant to criticize you. Even constructive criticism feels the same and makes you feel unsafe, because your nervous system doesn't know the difference. So no matter how much you prepare, you still feel defeated. You never feel like you can express what you want without someone coming at you, or without worrying they will.",
+    pills: ["Over-preparing everything", "Changing it last second", "Feeling worse after"],
+    practiceSteps: [
+      "Put one hand on your chest.",
+      "Breathe in slowly. On the way out, let out a warm, open sound, an \"ahhh\" or an \"ohh,\" and feel it move through your chest and belly.",
+      "Keep it soft. Don't force it. Do that six times."
+    ],
+    track: "Clear Energy Blocks Fast",
+    soundDoes: "That open sound on the exhale tells your body it can finally let go of the tension it's been carrying all these years. This isn't the first time you've felt it, but it may be the first time you learn how to release the old fear that being wrong, or being told you were wrong, was dangerous.",
+    buyHook: "You tense up before a hard conversation, already working out how to defend yourself.",
+    buySub: "You've done talk therapy and journaled endlessly about it, and it's still here. Understanding something and clearing it out of your body are two different things. The full Clear Energy Blocks Fast Activation can help you start to clear the wounds underneath this, so you can finally say what you mean without preparing for a fight.",
+    audioIntro: "Press play to experience the Clear Energy Blocks Fast Dragon Light Code Activation. Close your eyes, breathe, and surrender to the sound as it does the work for you. 45 seconds. Let's go.",
+    audio: "audio/ClearBlocksV3.mp3",
+    buyUrl: "https://theresanguyenspeaks.com/shop"
+  },
+  W: {
+    name: "Can't Find the Right Words",
+    icon: "🌀",
+    sub: "You know exactly what and how you feel, but the moment you go to say it, you get stuck trying to put it into words.",
+    explain: "You start tripping over your words, talking in circles, overexplaining, trying to help people understand what you're getting at. Their eyes glaze over, and you're no closer to your point than when you started. What's stored in your tissues right now is all the times you tried to explain something and got it wrong. There were times people looked confused, or they ignored you, or they didn't really pay attention to what you said. There were times you walked away feeling unappreciated. So all you feel is panic, and it won't let you think clearly. You just ramble on while the clarity slips further away. Then you walk off thinking, that's not what I meant. Why can't I just say what I want to say without sounding so stupid?",
+    pills: ["Going blank mid-sentence", "Talking in circles", "\"That's not what I meant\"", "\"I sounded so stupid\""],
+    practiceSteps: [
+      "Take a deep breath in. As you breathe out, make an \"eee\" sound, like in \"see.\"",
+      "Take another deep breath in. As you breathe out, make an \"ooo\" sound, like in \"you.\"",
+      "Keep switching back and forth, six rounds each.",
+    ],
+    track: "Unlock the Power of Your Chakras",
+    soundDoes: "You can't quite form what you want to say because your throat holds tension from every time expressing yourself went wrong. That block sits right in the energy center that handles your voice. The vibration from these vowel sounds moves through it, loosening the tightness and dissolving what's stuck, so you can step out of the anxiety and feel more free to express yourself.",
+    buyHook: "How many times have you said something, then thought, that's not what I meant... why couldn't I just say it the way I wanted to?",
+    buySub: "Your struggle to speak has nothing to do with your vocabulary. It comes from pain and past imprints that conditioned you to hold back your expression and your power. These memories live inside your body, every time you felt unsafe to express yourself. It builds up and manifests as that tightness in your throat. And it isn't just your throat that's blocked, these blocks are stored throughout your whole body. The full Unlock the Power of Your Chakras Activation reaches that stored tension and helps it release, so your words can flow.",
+    audioIntro: "Press play to experience the Unlock the Power of Your Chakras Dragon Light Code Activation. Close your eyes, breathe, and surrender to the sound as it does the work for you. 45 seconds. Let's go.",
+    audio: "audio/DNAActivationV2.mp3",
+    buyUrl: "https://theresanguyenspeaks.com/shop"
+  },
+  U: {
+    name: "Doesn't Feel Worthy to Speak",
+    icon: "🤫",
+    sub: "You hold back because part of you doesn't believe what you have to say matters.",
+    explain: "You don't feel like your thoughts or your opinions are good enough, so you keep them to yourself and let everyone else go first. You look around the room and figure everyone is smarter and more articulate than you, so who are you to add anything. Your body remembers being told to let other people talk, or being made to feel like your words and opinions didn't really matter, and that taught you everyone else was more worthy than you. So the default became to stay quiet and not cause trouble, to not be the one taking up too much space or being too loud. You don't want to bring attention to yourself, because the times you did, you got reprimanded, or in trouble, or yelled at. And the real you stays on the sidelines, trying to go unnoticed, waiting for someone to validate your voice before you'll use it. That's the wounded part of you talking, the limited self you molded years ago to stay safe, and it's been running the show ever since.",
+    pills: ["\"Who am I to say anything\"", "Putting yourself last", "Waiting to be asked"],
+    practiceSteps: [
+      "Stand up. Take a deep breath in. On the exhale, forcefully say \"ha\" while pressing your belly out at the same time.",
+      "Do this six times.",
+    ],
+    track: "Compassionate Self-Love",
+    soundDoes: "Pushing a sharp \"ha\" from your belly activates your diaphragm and vagus nerve, which calms the body while it powers the voice. It breaks the habit of clamping down and going quiet, the one your body learned to stay safe. Each \"ha\" teaches your nervous system that taking up space with sound is allowed. Your body needs to feel that, not just know it.",
+    buyHook: "Another year of the real you sitting quiet on the sidelines.",
+    buySub: "The women who step into their voice are no different from you. They healed the part of them that learned to stay quiet in the first place, and the full Compassionate Self-Love Activation is what gets you there.",
+    audioIntro: "Press play to experience the Compassionate Self-Love Dragon Light Code Activation. Close your eyes, breathe, and surrender to the sound as it does the work for you. 45 seconds. Let's go.",
+    audio: "audio/selflovev3.mp3",
+    buyUrl: "https://theresanguyenspeaks.com/shop"
+  },
+  S: {
+    name: "Shame Around Speaking Your Desires Out Loud",
+    icon: "🔒",
+    sub: "You'd rather go without than say what you want, desire, or need out loud.",
+    explain: "You know exactly what you want, and the second you'd have to say it out loud it feels too exposed, so you push it down and say you don't mind. It shows up everywhere. The raise you've earned and won't ask for. How you want your partner to touch you, the things you never say out loud in the bedroom. Even simple help, like asking someone to watch the kids so you can breathe. Asking feels like weakness, like needing anything makes you too much. Your body remembers the times you wanted something and were made to feel selfish or needy for it, and you learned that the easy one, the one who's fine with whatever, was the one who never became a burden to anyone. So you keep your wants to yourself, because your body can't tell the difference between asking for what you want and getting hurt. And it still aches, because the wanting never goes away. You just never give it the chance to be heard, so the raise, the touch, the help, none of it ever comes.",
+    pills: ["\"I don't mind\"", "Suppressing your desires", "Afraid you're asking for too much"],
+    practiceSteps: [
+      "Take a deep breath in. On the exhale, hum a closed \"mmm,\" then let your mouth open into \"ahh.\"",
+      "Do this six times, like you're savoring something you want."
+    ],
+    track: "Inner Peace",
+    soundDoes: "The \"mmm-ahh\" helps you release the tension your body has held from years of believing wanting was unsafe or unattainable. As the sound vibrates through your throat and body, it signals that it's safe to express pleasure and desire out loud, so what you want no longer feels out of reach. And it settles you into a calm state, where you can speak what you want and desire more clearly.",
+    buyHook: "What would change if you stopped pretending you didn't have needs and desires?",
+    buySub: "You've been brushing off your own needs for far too long. What you want matters, because if that desire lives in you, then it is meant for you. Saying it out loud just never felt safe. The full Inner Peace Activation starts to clear that unworthiness.",
+    audioIntro: "Press play to experience the Inner Peace Dragon Light Code Activation. Close your eyes, breathe, and surrender to the sound as it does the work for you. 45 seconds. Let's go.",
+    audio: "audio/InnerPeace.mp3",
+    buyUrl: "https://theresanguyenspeaks.com/shop"
+  },
+  V: {
+    name: "Don't Like the Sound of Your Voice",
+    icon: "🙈",
+    sub: "Hearing your own voice makes you cringe, like there's something wrong with how you sound.",
+    explain: "You hear the sound of your voice on a recording and you cringe without even thinking about it. You think the problem is that you sound weird, that it doesn't even sound like you. Maybe someone told you that you couldn't sing, or called you tone deaf. So you start to pick your voice apart, every little thing that sounds off about it. What you don't realize is that your voice is the most exposed thing you put out into the world. It carries your emotion, your hesitation, the parts of you that you can't fully hide or control. Your body remembers being made to feel like your voice was too much or annoying, or being heard got you laughed at. So the cringe isn't really about the sound. Your nervous system is reacting to an old trigger, the same one from when being heard made you feel small and unseen, so you learned to take up less space. And the picking apart does one more job for you. If something's technically wrong with your voice, you get to avoid the real thing underneath, which is the fear of being fully heard and judged for who you are. The cruel part is that it keeps you from the one thing you actually want, which is to finally be heard.",
+    pills: ["Cringing at playback", "Picking your voice apart", "\"I sound weird\""],
+    practiceSteps: [
+      "Take a deep breath in. On the exhale, tone a long \"ommm\" until you run out of breath.",
+      "Notice where it vibrates. Do this six times."
+    ],
+    track: "Dragon DNA Lightcode Activation",
+    soundDoes: "It's a natural sound that is authentically you, so there's no pitch to get right and nothing to get wrong. You make it and feel it vibrate in your own body, which slowly gets you comfortable being and hearing the source of sound again. Because the cringe is a nervous system response, not a real opinion about how you sound, this gives your body a new experience to go on. Each time you tone and nothing bad happens, it learns your voice is safe, and over time hearing yourself feels less threatening.",
+    buyHook: "The world has never gotten to hear the real you, because you can't stand hearing yourself.",
+    buySub: "You learned early on that being heard wasn't safe. That kind of shame is hidden in your body, in your tissues, your bones, your cells. The full Dragon DNA Light Code Activation works at the cellular level, helping to clear away what no longer serves you.",
+    audioIntro: "Press play to experience the Dragon DNA Light Code Activation. Close your eyes, breathe, and surrender to the sound as it does the work for you. 45 seconds. Let's go.",
+    audio: "audio/Dragon Sessions1_channelled_45s.mp3",
+    buyUrl: "https://theresanguyenspeaks.com/shop"
+  }
+};
+
+const TIE_PRIORITY = ["J", "C", "U", "W", "S", "V"];
+
+const QUESTIONS = [
+  {
+    q: "You're in a group of people who aren't close friends, and someone asks for your opinion. What happens first?",
+    a: [
+      ["I second guess what I'm going to say for fear of being misunderstood", "J"],
+      ["I worry I'm going to say something wrong and offend someone", "C"],
+      ["I know what I want to say, but by the time I try, it comes out completely wrong", "W"],
+      ["I think, who am I to say anything, someone else will say it better", "U"],
+      ["I stay quiet because I'm embarrassed to say what I actually think", "S"]
+    ]
+  },
+  {
+    q: "You have something you really want to ask for. What do you do?",
+    a: [
+      ["I think about it for days, but I'm afraid of what they'll think of me for asking", "J"],
+      ["I'm embarrassed to even ask, I don't want to make a big deal out of it", "C"],
+      ["I try to say it, but it never comes out the way I meant it", "W"],
+      ["I talk myself out of it, my needs don't feel important enough", "U"],
+      ["I stay quiet, the thought of hearing myself ask makes me uncomfortable", "V"]
+    ]
+  },
+  {
+    q: "Someone records you speaking, or you hear your voice played back. What happens?",
+    a: [
+      ["I immediately wonder what everyone thought of how I came across", "J"],
+      ["I pick apart everything I said and find what I should have said differently", "C"],
+      ["I cringe, it sounds nothing like me", "V"],
+      ["I feel embarrassed. That voice sounds weird", "V"]
+    ]
+  },
+  {
+    q: "You want to share something personal, a desire, a feeling, something you want. What stops you?",
+    a: [
+      ["The thought of being judged for wanting it", "J"],
+      ["The fear that someone will tell me I'm wrong for feeling that way", "C"],
+      ["The shame of saying what I actually want out loud", "S"],
+      ["The feeling that what I want doesn't matter enough to say", "U"],
+      ["I want to say it, but I can't find the words to explain it", "W"]
+    ]
+  },
+  {
+    q: "You're about to speak in front of a group that isn't your friends. What does your body do?",
+    a: [
+      ["My heart races, I get hot, and I become aware of every eye on me", "J"],
+      ["My throat tightens and I start going over what I'm going to say, again and again", "C"],
+      ["My mind goes blank and the words I had ready just disappear", "W"],
+      ["I feel myself getting smaller and freeze, like I don't belong here", "U"],
+      ["I feel dread the moment I realize people are going to hear my voice", "V"]
+    ]
+  },
+  {
+    q: "You want to share your spiritual gifts or your deeper knowing with someone. What happens?",
+    a: [
+      ["I worry about what they'll think of me, that they'll judge me", "J"],
+      ["I hold back in case they challenge me or think I'm crazy", "C"],
+      ["I feel it strongly, but I can't find the words without feeling weird about it", "W"],
+      ["Something wants to come out, but I get scared and pull it back before it does", "S"],
+      ["I'm afraid of what my voice will sound like when I try to channel or express it", "V"]
+    ]
+  },
+  {
+    q: "After a conversation where you held back and didn't say what you wanted, how do you feel?",
+    a: [
+      ["Frustrated that I cared so much about what they thought", "J"],
+      ["Relieved I didn't say the wrong thing, but also disappointed", "C"],
+      ["Annoyed, because what came out wasn't what I meant at all", "W"],
+      ["Like I let myself down again by not saying what I actually felt", "U"],
+      ["Embarrassed about what I almost said", "S"],
+      ["Grateful nobody had to hear my voice more than necessary", "V"]
+    ]
+  },
+  {
+    q: "What feels most true about why your voice gets stuck?",
+    a: [
+      ["I'm afraid of being judged for what I say or how I say it", "J"],
+      ["I'm afraid of saying something wrong and being criticized for it", "C"],
+      ["I know what I want to say, but I can never get it out the way I mean it", "W"],
+      ["I don't feel like what I have to say is important enough for people to hear", "U"],
+      ["I feel shame or embarrassment around saying what I actually want or feel", "S"],
+      ["I might say something that makes people think I'm dumb", "V"]
+    ]
+  }
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let current = 0;
+let answers = new Array(QUESTIONS.length).fill(null); // stores block letter per question
+
+const el = id => document.getElementById(id);
+
+/* ============================================================
+   localStorage
+   ============================================================ */
+const LS = {
+  save() {
+    try {
+      localStorage.setItem('vbd_answers', JSON.stringify(answers));
+    } catch(e) {}
+  },
+  saveResult(letter) {
+    try {
+      localStorage.setItem('vbd_completed', 'true');
+      localStorage.setItem('vbd_result', letter);
+    } catch(e) {}
+  },
+  clear() {
+    try {
+      localStorage.removeItem('vbd_completed');
+      localStorage.removeItem('vbd_result');
+      localStorage.removeItem('vbd_answers');
+    } catch(e) {}
+  },
+  getResult() {
+    try {
+      if (localStorage.getItem('vbd_completed') === 'true') {
+        return localStorage.getItem('vbd_result');
+      }
+    } catch(e) {}
+    return null;
+  }
+};
+
+/* ============================================================
+   SCREEN SWITCHING
+   ============================================================ */
+function show(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  el(screenId).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+/* ============================================================
+   QUIZ RENDER
+   ============================================================ */
+function renderQuestion() {
+  const item = QUESTIONS[current];
+  el('questionText').textContent = item.q;
+  el('qCount').textContent = `Question ${current + 1} of ${QUESTIONS.length}`;
+  el('progressFill').style.width = ((current) / QUESTIONS.length) * 100 + '%';
+
+  const opts = el('options');
+  opts.innerHTML = '';
+  item.a.forEach((pair, idx) => {
+    const [text, letter] = pair;
+    const b = document.createElement('button');
+    b.className = 'option';
+    b.textContent = text;
+    b.setAttribute('type', 'button');
+    if (answers[current] === idx) b.classList.add('selected');
+    b.addEventListener('click', () => {
+      answers[current] = idx; // store option index
+      LS.save();
+      [...opts.children].forEach(c => c.classList.remove('selected'));
+      b.classList.add('selected');
+      el('nextBtn').classList.remove('next-disabled');
+    });
+    opts.appendChild(b);
+  });
+
+  el('backBtn').style.display = current === 0 ? 'none' : 'block';
+  el('nextBtn').textContent = current === QUESTIONS.length - 1 ? 'See My Result' : 'Next';
+  if (answers[current] === null) {
+    el('nextBtn').classList.add('next-disabled');
+  } else {
+    el('nextBtn').classList.remove('next-disabled');
+  }
+}
+
+function nextQuestion() {
+  if (answers[current] === null) return;
+  if (current < QUESTIONS.length - 1) {
+    current++;
+    renderQuestion();
+  } else {
+    finishQuiz();
+  }
+}
+
+function prevQuestion() {
+  if (current > 0) {
+    current--;
+    renderQuestion();
+  }
+}
+
+/* ============================================================
+   SCORING
+   ============================================================ */
+function computeResult() {
+  const tally = {};
+  TIE_PRIORITY.forEach(k => tally[k] = 0);
+  answers.forEach((optIdx, qi) => {
+    if (optIdx === null) return;
+    const letter = QUESTIONS[qi].a[optIdx][1];
+    tally[letter] = (tally[letter] || 0) + 1;
+  });
+  let best = TIE_PRIORITY[0];
+  let bestCount = -1;
+  TIE_PRIORITY.forEach(letter => {
+    if (tally[letter] > bestCount) {
+      bestCount = tally[letter];
+      best = letter;
+    }
+  });
+  return best;
+}
+
+function finishQuiz() {
+  el('progressFill').style.width = '100%';
+  const letter = computeResult();
+  LS.saveResult(letter);
+  renderResult(letter);
+  show('result');
+}
+
+/* ============================================================
+   RESULT RENDER
+   ============================================================ */
+function renderResult(letter) {
+  const b = BLOCKS[letter];
+
+  // Hero card
+  el('resName').textContent = b.name;
+  el('resSub').textContent = b.sub;
+  el('resExplain').textContent = b.explain;
+
+  // Truth pills
+  const pillsEl = el('resPills');
+  pillsEl.innerHTML = '';
+  b.pills.forEach(p => {
+    const span = document.createElement('span');
+    span.className = 'pill';
+    span.textContent = p;
+    pillsEl.appendChild(span);
+  });
+
+  // Practice steps
+  const practiceEl = el('resPractice');
+  practiceEl.innerHTML = '';
+  b.practiceSteps.forEach((step, i) => {
+    const div = document.createElement('div');
+    div.className = 'practice-step';
+    div.innerHTML = `<span class="step-num">${i + 1}</span><span class="step-text">${step}</span>`;
+    practiceEl.appendChild(div);
+  });
+
+  // Sound does
+  el('resSoundDoes').textContent = b.soundDoes;
+  el('audioIntro').textContent = b.audioIntro;
+
+  // Buy push
+  el('buyHook').textContent = b.buyHook;
+  el('buySub').innerHTML = b.buySub;
+  el('upsellLine').textContent = 'The 45-second activation is just a mini experience. The full activation immerses you fully in the healing.';
+
+  const buy = el('buyBtn');
+  buy.textContent = `Get the Full ${b.track}`;
+  buy.href = b.buyUrl;
+
+  setupAudio(b.audio);
+}
+
+/* ============================================================
+   CUSTOM AUDIO PLAYER
+   ============================================================ */
+let audioReady = false;
+function setupAudio(src) {
+  const audio = el('audioEl');
+  const playBtn = el('playBtn');
+  const scrubFill = el('scrubFill');
+  const scrubTrack = el('scrubTrack');
+  const curTime = el('curTime');
+  const durTime = el('durTime');
+
+  audio.src = src;
+  playBtn.classList.remove('playing');
+  scrubFill.style.width = '0%';
+  curTime.textContent = '0:00';
+
+  function fmt(s) {
+    if (isNaN(s) || !isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec < 10 ? '0' : ''}${sec}`;
+  }
+
+  if (!audioReady) {
+    audio.addEventListener('loadedmetadata', () => {
+      durTime.textContent = fmt(audio.duration);
+    });
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration) {
+        scrubFill.style.width = (audio.currentTime / audio.duration) * 100 + '%';
+        curTime.textContent = fmt(audio.currentTime);
+      }
+    });
+    audio.addEventListener('ended', () => {
+      playBtn.classList.remove('playing');
+      scrubFill.style.width = '0%';
+    });
+    playBtn.addEventListener('click', () => {
+      if (audio.paused) {
+        audio.play().catch(() => {});
+        playBtn.classList.add('playing');
+      } else {
+        audio.pause();
+        playBtn.classList.remove('playing');
+      }
+    });
+    scrubTrack.addEventListener('click', (e) => {
+      const rect = scrubTrack.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      if (audio.duration) audio.currentTime = pct * audio.duration;
+    });
+    audioReady = true;
+  }
+}
+
+/* ============================================================
+   INIT + EVENTS
+   ============================================================ */
+el('startBtn').addEventListener('click', () => {
+  current = 0;
+  answers = new Array(QUESTIONS.length).fill(null);
+  renderQuestion();
+  show('quiz');
+});
+
+el('nextBtn').addEventListener('click', nextQuestion);
+el('backBtn').addEventListener('click', prevQuestion);
+
+el('startOverBtn').addEventListener('click', () => {
+  el('audioEl').pause();
+  LS.clear();
+  current = 0;
+  answers = new Array(QUESTIONS.length).fill(null);
+  show('welcome');
+});
+
+// On load: if completed before, jump to saved result
+(function init() {
+  const saved = LS.getResult();
+  if (saved && BLOCKS[saved]) {
+    renderResult(saved);
+    show('result');
+  } else {
+    show('welcome');
+  }
+})();
+</script>
+</body>
+</html>
